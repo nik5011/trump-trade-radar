@@ -1,5 +1,10 @@
 # 特朗普交易雷達 / Trump Trade Radar
 
+**線上版（每日自動更新）：<https://nik5011.github.io/trump-trade-radar/>**
+
+手機可直接開啟，或在 Safari／Chrome 選「加入主畫面」當成 App 使用。
+線上版是每日快照（每天台北時間 07:30 更新）；要即時同步請在本機執行 `node server.mjs`。
+
 用美國總統特朗普的**申報股票交易**做訊號評分、投資組合建議與事件式回測的本機 Web App。
 
 ```bash
