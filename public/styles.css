@@ -116,12 +116,20 @@ code, pre { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
 /* ------------------------------ 頁籤 ------------------------------ */
 .tabs {
   display: flex;
+  flex-direction: column;
   gap: 4px;
   padding: 12px 24px 0;
   border-bottom: 1px solid var(--line-soft);
-  overflow-x: auto;
+  background: linear-gradient(180deg, rgba(18, 26, 38, 0.6), transparent);
 }
 
+/* 頁籤按鈕自己一列，可橫向滑動（手機上 14 個頁籤不會擠成好幾行） */
+.tab-row {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 .tab {
   border: none;
   background: transparent;
@@ -135,6 +143,19 @@ code, pre { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* 手機版頁籤下拉選單。預設隱藏；必須寫在下面的 @media 之前，
+   否則後面的規則會蓋掉手機的 display:block，導致手機完全沒有導覽。 */
+.tab-select {
+  display: none;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
 
 /* ------------------------------ 版面 ------------------------------ */
 main { padding: 20px 24px 60px; display: flex; flex-direction: column; gap: 16px; }
@@ -465,9 +486,6 @@ svg.chart { width: 100%; height: auto; display: block; }
   .kpi .k-value { font-size: 19px; }
   .kpis { gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   /* 條件機率表在手機改成三欄，避免五欄擠爆 */
-  .cond-row { grid-template-columns: 1fr 62px 62px; gap: 6px 8px; padding: 8px 4px; }
-  .cond-row > span:nth-child(4), .cond-row > span:nth-child(5) { display: none; }
-  .cond-row.head { display: none; }
   .feed-item { grid-template-columns: 1fr; }
   .feed-item a, .feed-item > span { grid-column: 1 / 2; }
   .reason-card h3 { flex-direction: column; align-items: flex-start; gap: 4px; }
@@ -475,12 +493,26 @@ svg.chart { width: 100%; height: auto; display: block; }
   .filters input, .filters select { min-width: 0; width: 100%; }
   .table-wrap::after { content: '← 可左右滑動 →'; display: block; text-align: center; color: var(--muted); font-size: 11px; padding: 4px 0 0; }
   .btn { padding: 9px 13px; }
-  .tab { display: none; }
-  .tabs { padding: 8px 12px; }
+  /* 手機上「同時」保留可橫向滑動的頁籤列與下拉選單：
+     兩者都能用，避免任何一種被隱藏時使用者找不到其他頁面。 */
+  .tabs { padding: 8px 12px; gap: 8px; }
   .tab-select { display: block; width: 100%; }
+  .tab { padding: 8px 12px; font-size: 13.5px; }
+  /* 條件機率表：不刪欄位，改成可橫向滑動，保留全部 5 欄資訊 */
+  .cond-row { grid-template-columns: 180px 60px 70px 62px 72px; min-width: 460px; }
+  #ai-conditions { overflow-x: auto; }
 }
 
-/* 手機版頁籤選單（桌機隱藏） */
+/* 靜態快照版本：同步與匯入按鈕「變灰不能按」而不是消失，
+   這樣版面與本機版一致，使用者也知道功能存在、只是這個版本不支援。 */
+body.static-mode .sync-only {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* 靜態快照橫幅 */
 .static-banner {
   margin: 10px 24px 0;
   padding: 9px 14px;
@@ -490,16 +522,4 @@ svg.chart { width: 100%; height: auto; display: block; }
   color: var(--info);
   font-size: 12.5px;
   text-align: center;
-}
-body.static-mode .sync-only { display: none !important; }
-
-.tab-select {
-  display: none;
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 9px 12px;
-  font-size: 14px;
-  font-family: inherit;
 }
