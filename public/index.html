@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>特朗普交易雷達 · Trump Trade Radar</title>
+    <meta name="description" content="以美國總統特朗普的股票申報交易為基礎的訊號分析、投資組合建議與事件式回測工具。" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">TTR</span>
+        <div>
+          <h1>特朗普交易雷達</h1>
+          <p class="sub">總統申報交易 · 訊號評分 · 組合建議 · 事件回測</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="chip" id="chip-dataset">載入中…</div>
+        <div class="chip" id="chip-asof">—</div>
+        <button class="btn ghost" id="btn-reload" title="重新載入資料">重新整理</button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <nav class="tabs" id="tabs">
+      <select class="tab-select" id="tab-select" aria-label="切換頁面"></select>
+      <button class="tab active" data-tab="overview">總覽</button>
+      <button class="tab" data-tab="signals">訊號排行</button>
+      <button class="tab" data-tab="trades">交易明細</button>
+      <button class="tab" data-tab="portfolio">投資組合建議</button>
+      <button class="tab" data-tab="backtest">回測</button>
+      <button class="tab" data-tab="ai">AI 機率</button>
+      <button class="tab" data-tab="policy">政策雷達</button>
+      <button class="tab" data-tab="events">事件時鐘</button>
+      <button class="tab" data-tab="desk">執行與計分</button>
+      <button class="tab" data-tab="regime">市場體制</button>
+      <button class="tab" data-tab="book">我的部位</button>
+      <button class="tab" data-tab="insiders">內部人交易</button>
+      <button class="tab" data-tab="live">即時情報</button>
+      <button class="tab" data-tab="data">資料管理</button>
+    </nav>
+
+    <main>
+      <!-- ============================ 總覽 ============================ -->
+      <section class="panel active" id="tab-overview">
+        <div class="kpis" id="kpis"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>今日 Top 5 訊號</h2>
+              <span class="hint">依加權分數排序</span>
+            </div>
+            <div id="overview-top" class="rank-list"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>申報金額產業分布</h2>
+              <span class="hint">依買入金額區間中位數</span>
+            </div>
+            <div id="overview-sectors"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>最新申報動態</h2>
+              <span class="hint">含申報延遲天數</span>
+            </div>
+            <div id="overview-timeline" class="timeline"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>風險提示摘要</h2>
+              <span class="hint">自動彙整</span>
+            </div>
+            <div id="overview-warnings" class="flag-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================== 訊號排行 ========================== -->
+      <section class="panel" id="tab-signals">
+        <div class="card">
+          <div class="card-head">
+            <h2>評分權重</h2>
+            <button class="btn ghost small" id="btn-reset-weights">回復預設</button>
+          </div>
+          <div class="sliders" id="weight-sliders"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>標的評分排行</h2>
+            <div class="row-actions">
+              <span class="hint" id="signal-count">—</span>
+              <button class="btn ghost small" id="btn-signal-more">顯示全部</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="signal-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>標的</th><th>產業</th><th class="num">總分</th>
+                  <th>分項</th><th class="num">淨買入</th><th class="num">現價*</th>
+                  <th class="num">60 日</th><th class="num">最新申報</th><th>警訊</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="detail-card" hidden>
+          <div class="card-head">
+            <h2 id="detail-title">個股診斷</h2>
+            <button class="btn ghost small" id="btn-close-detail">關閉</button>
+          </div>
+          <div id="detail-body" class="detail"></div>
+        </div>
+      </section>
+
+      <!-- ========================== 交易明細 ========================== -->
+      <section class="panel" id="tab-trades">
+        <div class="card">
+          <div class="card-head">
+            <h2>申報交易紀錄</h2>
+            <div class="row-actions">
+              <a class="btn ghost small" href="/api/export.csv">匯出 CSV</a>
+            </div>
+          </div>
+          <div class="filters">
+            <label>關鍵字<input type="search" id="f-search" placeholder="ticker 或公司名稱" /></label>
+            <label>買賣別
+              <select id="f-side">
+                <option value="">全部</option>
+                <option value="BUY">買入</option>
+                <option value="SELL">賣出</option>
+              </select>
+            </label>
+            <label>金額下限（美元）
+              <select id="f-amount">
+                <option value="0">不限</option>
+                <option value="100000">≥ 10 萬</option>
+                <option value="500000">≥ 50 萬</option>
+                <option value="1000000">≥ 100 萬</option>
+              </select>
+            </label>
+            <label>起始日<input type="date" id="f-from" /></label>
+            <label>結束日<input type="date" id="f-to" /></label>
+            <button class="btn ghost small" id="btn-clear-filters">清除</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="trade-table">
+              <thead>
+                <tr>
+                  <th data-sort="tradeDate">成交日</th>
+                  <th data-sort="filedDate">申報日</th>
+                  <th data-sort="lag" class="num">延遲</th>
+                  <th data-sort="ticker">標的</th>
+                  <th data-sort="company">公司</th>
+                  <th data-sort="side">方向</th>
+                  <th data-sort="amount" class="num">金額區間</th>
+                  <th data-sort="amount" class="num">中位數</th>
+                  <th>帳戶</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="row-actions" id="trade-pager" style="margin-top: 12px"></div>
+          <p class="footnote" id="trade-count">—</p>
+        </div>
+      </section>
+
+      <!-- ======================== 投資組合建議 ======================== -->
+      <section class="panel" id="tab-portfolio">
+        <div class="card">
+          <div class="card-head">
+            <h2>組合限制條件</h2>
+            <span class="hint">調整後即時重算</span>
+          </div>
+          <div class="sliders" id="portfolio-sliders"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2>建議配置</h2><span class="hint" id="portfolio-gross">—</span></div>
+            <div id="portfolio-alloc"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>產業曝險</h2><span class="hint">含上限檢核</span></div>
+            <div id="portfolio-sectors"></div>
+            <ul class="notes" id="portfolio-notes"></ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>每一檔的進場理由與風險</h2></div>
+          <div id="portfolio-reasons" class="reason-grid"></div>
+        </div>
+      </section>
+
+      <!-- ============================ 回測 ============================ -->
+      <section class="panel" id="tab-backtest">
+        <div class="card">
+          <div class="card-head">
+            <h2>回測設定</h2>
+            <span class="hint">以「申報日」為訊號日，避免使用未公開資訊</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            申報制的特性是「同一份申報的訊號會全部集中在同一天」出現。當天訊號超過同時持倉上限時，
+            系統會先處理出場以釋放名額，再依<b>申報金額由大到小</b>決定進場順序。
+          </p>
+          <div class="sliders" id="backtest-sliders"></div>
+        </div>
+
+        <div class="kpis" id="backtest-kpis"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>資產曲線</h2>
+            <span class="hint">策略 vs 示範大盤（等權）</span>
+          </div>
+          <div id="equity-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>逐筆跟單結果</h2><span class="hint" id="backtest-events-hint">—</span></div>
+          <div class="table-wrap">
+            <table class="table" id="backtest-table">
+              <thead>
+                <tr>
+                  <th>標的</th><th>成交日</th><th>訊號日</th><th>進場日</th><th>出場日</th>
+                  <th class="num">持有</th><th class="num">進場價</th><th class="num">出場價</th>
+                  <th class="num">報酬</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <!-- ========================== 政策雷達 ========================== -->
+      <!-- ========================== AI 機率 ========================== -->
+      <section class="panel" id="tab-ai">
+        <div class="card">
+          <div class="card-head">
+            <h2>AI 機率模型：用歷史規律估計漲跌機率</h2>
+            <span class="hint" id="ai-status">尚未訓練</span>
+          </div>
+          <div class="filters">
+            <label>預測期間
+              <select class="sync-only" id="ai-horizon">
+                <option value="5">未來 5 個交易日</option>
+                <option value="20" selected>未來 20 個交易日</option>
+                <option value="60">未來 60 個交易日</option>
+              </select>
+            </label>
+            <button class="btn primary small" id="btn-ai-run">訓練 / 重新整理</button>
+            <span class="hint">用時間切分做樣本外檢驗，訓練約 2～5 秒</span>
+          </div>
+          <div id="ai-verdict" class="verdict"></div>
+          <div class="kpis" id="ai-kpis" style="margin-top: 14px"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>條件機率表：符合哪些條件時，歷史上漲機率最高</h2>
+            <span class="hint">全樣本描述統計，附樣本數與相對基準的差距</span>
+          </div>
+          <div id="ai-conditions"></div>
+          <p class="footnote">
+            「提升」＝ 該條件的上漲機率減去全體平均。樣本數太小的條件不會列出（至少 30 筆）。
+            這是歷史描述統計，不是未來的保證。
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2>上升機率排行</h2><span class="hint">校正後機率</span></div>
+            <div id="ai-up" class="feed"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>下跌機率排行</h2><span class="hint">校正後機率</span></div>
+            <div id="ai-down" class="feed"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2>特徵權重</h2><span class="hint">正值＝推升機率</span></div>
+            <div id="ai-weights"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>機率校正曲線</h2><span class="hint">模型說 70% 時，實際是多少</span></div>
+            <div id="ai-calibration"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>模型變體比較</h2>
+            <span class="hint">不同特徵組合的樣本外表現</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="ai-variants">
+              <thead>
+                <tr>
+                  <th>特徵組合</th><th class="num">特徵數</th><th class="num">樣本外準確率</th>
+                  <th class="num">基準率</th><th class="num">優勢</th><th class="num">AUC</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>方法與限制（請務必先讀）</h2>
+          <p id="ai-method"></p>
+        </div>
+      </section>
+
+      <!-- ========================== 政策雷達 ========================== -->
+      <section class="panel" id="tab-policy">
+        <div class="card">
+          <div class="card-head">
+            <h2>政策雷達：他的政策 × 他的持股</h2>
+            <span class="hint" id="policy-status">—</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            左半是把特朗普政府提出的政策主題，對照到受影響的個股；右半是他申報的實際買賣。
+            政策文件抓自 Federal Register 官方 API，「政策－個股」方向是本工具可調整的啟發式設定。
+          </p>
+          <div class="filters">
+            <label>交集時間窗
+              <select id="pol-window">
+                <option value="14">±14 天</option>
+                <option value="30" selected>±30 天</option>
+                <option value="60">±60 天</option>
+                <option value="90">±90 天</option>
+              </select>
+            </label>
+            <button class="btn primary small sync-only" id="btn-sync-policy-all">抓取各主題政策文件</button>
+            <span class="hint" id="policy-coverage"></span>
+          </div>
+          <div id="policy-result" class="import-result"></div>
+          <div class="kpis" id="policy-kpis" style="margin-top: 14px"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>政策曝險 × 申報淨買賣</h2>
+              <span class="hint">圓圈大小＝申報金額</span>
+            </div>
+            <div id="policy-scatter"></div>
+            <p class="footnote">
+              橫軸負值＝受損型曝險、正值＝受惠型曝險；縱軸＜0 代表他在該標的淨賣出。
+              「政策受惠卻淨賣出」或「政策受損卻淨買入」是最值得細看的象限。
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>產業資金熱力圖</h2>
+              <span class="hint">面積＝申報金額 · 綠＝淨買 · 紅＝淨賣</span>
+            </div>
+            <div id="sector-treemap"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>政策事件 × 交易時間軸</h2>
+            <span class="hint" id="policy-timeline-hint">—</span>
+          </div>
+          <div class="filters">
+            <label>主題
+              <select id="pol-theme"></select>
+            </label>
+          </div>
+          <div id="policy-timeline"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>政策主題與曝險標的</h2>
+            <span class="hint">每一列都可看到他在該主題的實際淨買賣</span>
+          </div>
+          <div id="policy-themes" class="reason-grid"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>政策事件與交易的接近程度</h2>
+            <span class="hint" id="policy-pairs-hint">僅代表時間接近，不代表因果</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="policy-pairs-table">
+              <thead>
+                <tr>
+                  <th>主題</th><th>標的</th><th>方向</th><th>政策文件</th><th class="num">文件日</th>
+                  <th class="num">成交日</th><th class="num">差距</th><th>交易</th><th class="num">金額</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>政策對照的判讀原則</h2>
+          <p id="policy-disclaimer"></p>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <!-- ========================== 事件時鐘 ========================== -->
+      <section class="panel" id="tab-events">
+        <div class="card">
+          <div class="card-head">
+            <h2>事件時鐘：未來有哪些會影響價格的事</h2>
+            <span class="hint" id="events-status">尚未同步</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            政策生效日與評論截止來自 Federal Register（官方 API，含 <code>effective_on</code>），
+            財報日來自 Nasdaq 日曆並只保留我們追蹤的標的。這是「什麼時候該進出」的依據，
+            也是短中期最容易出現跳空的地方。
+          </p>
+          <div class="filters">
+            <label>時間範圍
+              <select class="sync-only" id="events-days">
+                <option value="14">未來 14 天</option>
+                <option value="30" selected>未來 30 天</option>
+                <option value="60">未來 60 天</option>
+                <option value="90">未來 90 天</option>
+              </select>
+            </label>
+            <button class="btn primary small sync-only" id="btn-sync-events">抓取最新事件</button>
+            <span class="hint" id="events-range"></span>
+          </div>
+          <div id="events-result" class="import-result"></div>
+          <div class="kpis" id="events-kpis" style="margin-top: 14px"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>事件密度</h2>
+            <span class="hint">每一天有幾件事在發生</span>
+          </div>
+          <div id="events-density"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>時間軸明細</h2>
+            <span class="hint">依日期排序，T+ 為距離今天的天數</span>
+          </div>
+          <div id="events-list" class="feed"></div>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>怎麼用事件時鐘</h2>
+          <p>
+            財報日（尤其盤後）是跳空風險最高的時點，事件前後的部位大小應該不同；
+            政策生效日常伴隨供應鏈與成本結構的重新定價；評論截止日代表規則還沒定案，
+            之後可能翻盤。<b>這些是風險管理的日曆，不是交易訊號本身</b>——
+            把它跟「訊號排行」和「執行與計分」一起看：有訊號、有流動性、而且沒有事件擋在路上，才是可以下手的情境。
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================== 執行與計分 ========================== -->
+      <section class="panel" id="tab-desk">
+        <div class="card">
+          <div class="card-head">
+            <h2>容量與流動性：這個訊號吃得下多少錢</h2>
+            <span class="hint" id="desk-status">載入中…</span>
+          </div>
+          <div class="kpis" id="desk-kpis"></div>
+          <div class="filters" style="margin-top: 12px">
+            <label>排序
+              <select id="desk-sort">
+                <option value="adv">依成交金額（大→小）</option>
+                <option value="hard">依最難消化（申報金額 ÷ 日成交量）</option>
+                <option value="risk">依跳空風險</option>
+              </select>
+            </label>
+            <label>只看申報過的
+              <select id="desk-filter">
+                <option value="traded">只看有申報紀錄</option>
+                <option value="all">全部</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table" id="desk-table">
+              <thead>
+                <tr>
+                  <th>標的</th><th class="num">現價</th><th class="num">20 日均額</th><th>流動性</th>
+                  <th class="num">申報金額 ÷ 日成交量</th><th class="num">最大單筆</th>
+                  <th class="num">單筆建議上限</th><th class="num">跳空風險</th><th class="num">申報筆數</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="footnote">
+            「申報金額 ÷ 日成交量」＝ 把他申報的金額全部吃下來要花掉幾天的成交量（愈小愈好消化）。
+            「單筆建議上限」以單日不超過 10% 日均量估算，是一般機構執行時的粗略慣例，不是硬性規則。
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>訊號衰減曲線：這個訊號在第幾天開始失效</h2>
+            <span class="hint" id="desk-scorecard-hint">—</span>
+          </div>
+          <div id="desk-decay"></div>
+          <div class="chart-legend" id="desk-decay-legend"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>訊號各期間命中率</h2>
+              <span class="hint">相對基準的差距（pp）</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="desk-signal-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>資訊係數（IC）</h2>
+              <span class="hint">特徵與未來報酬的秩相關</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="desk-ic-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>怎麼讀計分卡</h2>
+          <p>
+            IC 是特徵值與未來報酬的秩相關，一般認為 |IC| &gt; 0.05 才算有微弱的預測價值，
+            0.02～0.03 基本上在雜訊範圍。命中率的「提升」是與同期全體平均相比；
+            樣本數小於 30 的訊號不會列出。<b>同一組數字在不同期間會變動</b>，
+            這張表是拿來判斷「哪個訊號值得繼續用、哪個該丟掉」，不是拿來當買賣清單。
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <!-- ========================== 市場體制 ========================== -->
+      <section class="panel" id="tab-regime">
+        <div class="card">
+          <div class="card-head">
+            <h2>市場體制：先看環境，再看訊號</h2>
+            <span class="hint" id="regime-status">載入中…</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            單一訊號脫離環境幾乎沒有意義。這裡用 15 個跨資產維度（趨勢、寬度、波動、利率、信用、美元、商品、科技、新興市場）
+            算出「風險偏好 ↔ 風險趨避」的綜合分數，並用<b>擴張視窗百分位</b>計算，
+            只使用當日之前的資料，避免用未來資料美化歷史。
+          </p>
+          <div class="filters">
+            <button class="btn primary small sync-only" id="btn-sync-regime">更新體制資料</button>
+            <span class="hint">資料來源：Yahoo Chart API（免費、無金鑰）</span>
+          </div>
+          <div id="regime-result" class="import-result"></div>
+          <div class="kpis" id="regime-kpis" style="margin-top: 14px"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>各維度水位</h2>
+              <span class="hint">0 = 歷史上最偏風險趨避、100 = 最偏風險偏好</span>
+            </div>
+            <div id="regime-dimensions"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>體制時間軸</h2>
+              <span class="hint">近兩年綜合分數 vs S&P 500</span>
+            </div>
+            <div id="regime-timeline"></div>
+            <p class="footnote">背景色代表當日的體制分數（紅＝風險趨避、灰＝中性、綠＝風險偏好），藍線是 SPY 正規化走勢。</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>同一個訊號，在不同體制下的表現</h2>
+            <span class="hint" id="regime-conditional-hint">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="regime-table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="footnote">
+            數字是「該訊號在該體制下的命中率」減去「同期同體制下全體平均命中率」（單位：百分點），
+            持有期間為 20 個交易日。括號內是樣本數——風險趨避期間的樣本通常很少，
+            看到 n 很小的格子請直接忽略。
+          </p>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>怎麼用市場體制</h2>
+          <p>
+            體制不是拿來預測方向的，是拿來決定<b>該不該相信其他訊號</b>。
+            例如「距 52 週高點 &lt; 3%（強勢股）」在風險偏好期間的表現明顯優於風險趨避期間；
+            而「跌深反彈」型的訊號只在中性體制有效。同樣一個訊號，換個環境就該換個部位大小。
+            <br><br>限制：跨資產資料只有約兩年，涵蓋的體制變化有限（我們的樣本期間大多是中性到風險偏好），
+            所以「風險趨避」那一欄的樣本通常不足以下結論。<b>本頁不是投資建議。</b>
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <!-- ========================== 我的部位 ========================== -->
+      <section class="panel" id="tab-book">
+        <div class="card">
+          <div class="card-head">
+            <h2>我的部位：把「我的帳」跟所有訊號交叉比對</h2>
+            <span class="hint" id="book-status">尚未匯入</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            只要三個欄位就能用：<code>ticker,shares,avgCost</code>（成本選填）。
+            匯入後會算出市值與權重、流動性與跳空風險、產業與政策曝險集中度，
+            並把每一檔跟「申報訊號、AI 機率、財報日、政策方向」對照，列出需要處理的警示。
+            <b>部位資料只存在你自己的電腦（data/positions.json），不會上傳到任何地方。</b>
+          </p>
+          <div class="filters">
+            <label>匯入模式
+              <select id="book-mode">
+                <option value="replace">取代現有部位</option>
+                <option value="append">附加（同代號會合併股數）</option>
+              </select>
+            </label>
+            <button class="btn primary small sync-only" id="btn-book-import">匯入部位</button>
+            <button class="btn ghost small" id="btn-book-template">載入範本</button>
+            <button class="btn ghost small" id="btn-book-refresh">重新整理</button>
+            <button class="btn danger small sync-only" id="btn-book-clear">清除部位</button>
+          </div>
+          <textarea id="book-text" rows="6" spellcheck="false" placeholder="ticker,shares,avgCost&#10;NVDA,120,180.50&#10;AMZN,80,230"></textarea>
+          <div id="book-result" class="import-result"></div>
+        </div>
+
+        <div class="card" id="book-analysis" hidden>
+          <div class="card-head">
+            <h2>部位總覽</h2>
+            <span class="hint" id="book-updated"></span>
+          </div>
+          <div class="kpis" id="book-kpis"></div>
+          <div class="grid-2" style="margin-top: 16px">
+            <div>
+              <h3 style="font-size:13px;color:var(--muted);margin-bottom:8px">產業集中度</h3>
+              <div id="book-sectors"></div>
+            </div>
+            <div>
+              <h3 style="font-size:13px;color:var(--muted);margin-bottom:8px">需要處理的警示</h3>
+              <div id="book-warnings" class="flag-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="book-table-card" hidden>
+          <div class="card-head">
+            <h2>部位明細與訊號對照</h2>
+            <span class="hint">依市值排序</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="book-table">
+              <thead>
+                <tr>
+                  <th>標的</th><th>產業</th><th class="num">股數</th><th class="num">現價</th>
+                  <th class="num">市值</th><th class="num">權重</th><th class="num">未實現損益</th>
+                  <th class="num">佔日成交量</th><th class="num">跳空風險</th>
+                  <th>政策</th><th class="num">下跌機率</th><th>財報</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="footnote">
+            「佔日成交量」是你持有的股數佔該檔 20 日均量的比例，超過 5% 就要考慮分批出場。
+            「下跌機率」來自 AI 機率頁的校正後機率（樣本外 AUC 約 0.52，僅供參考）。
+          </p>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>這個頁面能與不能做什麼</h2>
+          <p>
+            <b>能</b>：算出你的實際暴露、集中度、流動性與事件風險，並把每一檔跟網站上所有訊號對照，
+            找出「有訊號、但你的部位配置不合理」的地方。
+            <b>不能</b>：它不會告訴你該買什麼；它也不是投資建議。若你有券商匯出的 CSV（含成本與日期），
+            直接貼進來就行，欄位名稱有容錯。
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <!-- ========================== 內部人交易 ========================== -->
+      <section class="panel" id="tab-insiders">
+        <div class="card">
+          <div class="card-head">
+            <h2>內部人交易：Form 4 的即時訊號</h2>
+            <span class="hint" id="ins-status">尚未抓取</span>
+          </div>
+          <p class="hint" style="margin-bottom: 12px">
+            Form 4 必須在交易後 <b>2 個營業日</b>內申報，幾乎沒有延遲，而且是「本人下單」的直接證據——
+            這是它比總統申報（延遲 1～6 週）有用得多的原因。資料來自 SEC EDGAR（免費、無需金鑰）。
+            <br>分數<b>只用買進</b>計算：賣出大多是既定的分散或 10b5-1 計畫，預測力很弱；買進（尤其多位內部人同期買進）才有意義。
+          </p>
+          <div class="filters">
+            <label>統計期間
+              <select class="sync-only" id="ins-days">
+                <option value="60">近 60 天</option>
+                <option value="120" selected>近 120 天</option>
+                <option value="240">近 240 天</option>
+              </select>
+            </label>
+            <button class="btn primary small sync-only" id="btn-sync-insiders">抓取 Form 4</button>
+            <span class="hint">掃描申報金額前 36 大標的、每檔最近 5 份申報，約 25～35 秒（SEC 限速 8 次/秒）</span>
+          </div>
+          <div id="ins-result" class="import-result"></div>
+          <div class="kpis" id="ins-kpis" style="margin-top: 14px"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>內部人買進訊號排行</h2>
+            <span class="hint">分數＝集群程度 45% ＋ 金額 35% ＋ 職位 20%</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="ins-table">
+              <thead>
+                <tr>
+                  <th>標的</th><th class="num">分數</th><th class="num">買進筆數</th><th class="num">買進人數</th>
+                  <th class="num">集群</th><th class="num">買進金額</th><th class="num">賣出筆數</th>
+                  <th class="num">賣出金額</th><th class="num">最近買進</th><th>訊號</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>買進明細（代碼 P）</h2>
+              <span class="hint">唯一真正的看多訊號</span>
+            </div>
+            <div id="ins-buys" class="feed"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>與其他訊號交叉比對</h2>
+              <span class="hint">內部人買進 × 總統申報 × 政策</span>
+            </div>
+            <div id="ins-cross" class="feed"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>最近交易明細</h2>
+            <span class="hint" id="ins-recent-hint">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="ins-recent">
+              <thead>
+                <tr>
+                  <th>日期</th><th>標的</th><th>申報人</th><th>職位</th><th>代碼</th>
+                  <th class="num">股數</th><th class="num">價格</th><th class="num">金額</th><th class="num">持有後</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>怎麼用內部人交易</h2>
+          <p>
+            研究上最有用的是<b>集群買進</b>（短期內多位內部人一起買）與<b>高階主管的大額買進</b>，
+            因為那代表內部人願意用自己的錢承擔風險。相對地：
+            <b>賣出</b>大多來自薪酬流程（行使選擇權後賣出、稅務扣繳）或既定的 10b5-1 計畫，訊號很弱；
+            <b>授予（A）、稅務（F）、贈與（G）</b>完全不是訊號。
+            <br><br>限制：這裡只掃描申報金額前 24 大標的（每檔最近 6 份申報），不是全市場；
+            SEC 只公開申報內容，不保證資料完整性。本頁不是投資建議。
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================== 即時情報 ========================== -->
+      <section class="panel" id="tab-live">
+        <div class="card">
+          <div class="card-head">
+            <h2>先講結論：申報資料沒有真正的「即時」</h2>
+            <span class="hint">這是法規限制，不是技術問題</span>
+          </div>
+          <div id="live-explainer" class="explainer"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>特朗普申報即時監看（OGE 官方資料庫）</h2>
+            <span class="hint" id="oge-status">尚未檢查</span>
+          </div>
+          <div class="filters">
+            <label style="flex: 1">申報人（OGE 格式：姓, 名）
+              <input type="search" id="oge-name" value="Trump, Donald J" />
+            </label>
+            <button class="btn primary small sync-only" id="btn-sync-oge">檢查有無新申報</button>
+          </div>
+          <div id="oge-result" class="import-result"></div>
+          <div id="live-oge" class="feed"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2>價格資料來源</h2>
+              <span class="hint" id="price-status">—</span>
+            </div>
+            <div id="live-price"></div>
+            <div class="filters" style="margin-top: 12px">
+              <label>來源
+                <select id="price-provider">
+                  <option value="">自動（Yahoo → Stooq）</option>
+                  <option value="yahoo">Yahoo Finance</option>
+                  <option value="stooq">Stooq</option>
+                </select>
+              </label>
+              <button class="btn primary small sync-only" id="btn-sync-prices">同步真實價格</button>
+              <button class="btn ghost small sync-only" id="btn-reset-prices">改用模擬價格</button>
+            </div>
+            <div id="live-price-result" class="import-result"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>申報資料自動匯入</h2>
+              <span class="hint">通用 JSON 端點，自動對應欄位</span>
+            </div>
+            <div class="filters">
+              <label style="flex: 1">端點 URL
+                <input type="search" id="d-url" placeholder="https://api.example.com/politician-trades?name=trump" />
+              </label>
+              <label>API 金鑰（可留空）
+                <input type="search" id="d-key" placeholder="Bearer token" />
+              </label>
+              <label>模式
+                <select id="d-mode">
+                  <option value="replace">取代現有</option>
+                  <option value="append">附加去重</option>
+                </select>
+              </label>
+              <button class="btn primary small sync-only" id="btn-sync-disclosures">抓取並匯入</button>
+            </div>
+            <div id="live-disclosure-result" class="import-result"></div>
+            <p class="hint" style="margin-top: 10px">
+              系統會在回應中自動尋找「紀錄陣列」並對應 ticker／日期／金額欄位，
+              適用 Quiver Quantitative、Unusual Whales、Capitol Trades 鏡像，或你自己寫的 OGE 爬蟲端點。
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>新聞快訊雷達</h2>
+            <span class="hint" id="news-status">—</span>
+          </div>
+          <div class="filters">
+            <label style="flex: 1">關鍵字
+              <input type="search" id="n-query" value="Trump stock purchase disclosure" />
+            </label>
+            <button class="btn primary small sync-only" id="btn-sync-news">更新快訊</button>
+          </div>
+          <div id="live-news" class="feed"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+          <div class="card-head">
+            <h2>政策與法規訊號（Federal Register）</h2>
+            <span class="hint" id="fr-status">尚未同步</span>
+          </div>
+            <div class="filters">
+              <label style="flex: 1">關鍵字<input type="search" id="p-term" value="tariff semiconductor" /></label>
+              <button class="btn primary small sync-only" id="btn-sync-policy">更新</button>
+            </div>
+            <div id="live-policy" class="feed"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2>政府採購合約（USAspending）</h2>
+              <span class="hint" id="contracts-status">—</span>
+            </div>
+            <div class="filters">
+              <button class="btn primary small sync-only" id="btn-sync-contracts">更新近 30 天</button>
+              <span class="hint">對國防、工業類標的是即時基本面訊號</span>
+            </div>
+            <div id="live-contracts" class="feed"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================== 資料管理 ========================== -->
+      <section class="panel" id="tab-data">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2>目前資料集</h2></div>
+            <div id="data-status" class="status-list"></div>
+            <div class="row-actions">
+              <a class="btn ghost small" href="/api/export.csv">匯出現有紀錄</a>
+              <button class="btn danger small sync-only" id="btn-reset">回復示範資料</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>真實資料來源</h2><span class="hint">點擊前往官方或整理站</span></div>
+            <div id="data-sources" class="source-list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>載入真實申報資料</h2>
+            <span class="hint">把示範資料換成真實交易紀錄</span>
+          </div>
+          <div class="filters">
+            <label>匯入模式
+              <select id="rd-mode">
+                <option value="replace">取代現有資料集</option>
+                <option value="append">附加並去重</option>
+              </select>
+            </label>
+            <button class="btn primary small sync-only" id="btn-load-external">載入 Q1 2026 申報資料（3,642 筆）</button>
+            <button class="btn ghost small sync-only" id="btn-scan-files">重新掃描 data/ 檔案</button>
+          </div>
+          <div id="rd-result" class="import-result"></div>
+          <div id="rd-files" class="status-list" style="margin-top: 12px"></div>
+          <p class="hint" style="margin-top: 10px">
+            第三方資料集為他人自 OGE 278-T PDF 解析並對應股票代號的結果，非 OGE 官方結構化資料；
+            每筆紀錄的來源都會標在「交易明細」頁，正式使用前請以 OGE 正本核對。
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>匯入申報交易</h2>
+            <span class="hint">CSV 或 JSON，欄位自動對應</span>
+          </div>
+          <div class="filters">
+            <label>格式
+              <select id="i-format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+              </select>
+            </label>
+            <label>模式
+              <select id="i-mode">
+                <option value="replace">取代現有資料集</option>
+                <option value="append">附加並去重</option>
+              </select>
+            </label>
+            <button class="btn ghost small" id="btn-template">載入範本</button>
+            <button class="btn primary small sync-only" id="btn-import">匯入</button>
+          </div>
+          <textarea id="i-text" rows="10" spellcheck="false"
+            placeholder="tradeDate,filedDate,ticker,company,side,amountMin,amountMax,owner,source"></textarea>
+          <div id="import-result" class="import-result"></div>
+          <details class="api-doc">
+            <summary>API 與自動化接法</summary>
+            <pre>GET  /api/state                            目前資料集狀態
+GET  /api/analysis?topN=8&amp;w_size=0.3&amp;holdDays=90  完整分析（評分／組合／回測參數皆可調）
+GET  /api/market?source=synthetic|live      市場價格序列（含等權指數）
+POST /api/sync/prices       {provider}      同步真實價格（yahoo / stooq）
+POST /api/sync/news         {query}         抓即時新聞快訊（Google News RSS）
+POST /api/sync/policy       {term}          抓政策文件（Federal Register）
+POST /api/sync/contracts    {days}          抓政府採購合約（USAspending）
+POST /api/sync/disclosures  {url,apiKey}    從任意 JSON 端點抓申報並匯入
+POST /api/import            {format,mode,text} 手動匯入 CSV / JSON
+POST /api/reset                             回復示範資料
+GET  /api/export.csv                        匯出目前資料集</pre>
+            <p class="hint">
+              自動化：用排程抓 OGE 申報檔 → 轉成 CSV → POST /api/import（append）即可每日更新；
+              或把外部服務的 JSON 端點交給 /api/sync/disclosures 自動對應欄位。
+            </p>
+          </details>
+        </div>
+
+        <div class="card disclaimer">
+          <h2>免責聲明</h2>
+          <p>
+            本工具是資料分析與教學用途的資訊整理介面，<strong>不構成投資建議、也不保證任何報酬</strong>。
+            申報資料僅揭露金額區間且有數週延遲，跟單時的真實成本與價格可能與申報內容大幅偏離。
+            內建價格為模擬序列，回測數字僅用於驗證流程。任何投資決策請自行判斷並承擔風險。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <div class="loading" id="loading">載入分析中…</div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

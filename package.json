@@ -1,0 +1,19 @@
+{
+  "name": "trump-trade-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "以美國總統特朗普的申報股票交易做訊號評分、組合建議與事件回測的本機 Web App（零依賴）",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node scripts/build-static.mjs",
+    "preview": "node scripts/serve-static.mjs",
+    "test": "node --test --test-isolation=none test/providers.test.mjs",
+    "check-sources": "node scripts/check-sources.mjs",
+    "oge:list": "node scripts/fetch-oge-filings.mjs",
+    "oge:download": "node scripts/fetch-oge-filings.mjs --download"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

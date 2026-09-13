@@ -1,3 +1,17 @@
-# trump-trade-radar
+# 產生物
+dist/
+node_modules/
+tmp/
+.git-local/
 
-特朗普申報交易 × 政策 × 內部人交易的訊號分析儀表板。
+# 你自己的資料（不要上傳到公開空間）
+data/positions.json
+data/store.json
+data/live-cache.json
+data/config.json
+data/github-token.txt
+data/external/
+
+# OGE 申報 PDF 正本（每份數 MB，工作流程只需要 data/oge/transactions.csv）
+data/oge/*.pdf
+data/oge/index.json

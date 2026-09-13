@@ -1,0 +1,75 @@
+name: 更新資料並部署靜態版
+
+# 每天自動跑一次（台北時間早上 7:30 左右），也可以在 Actions 頁面手動觸發
+on:
+  schedule:
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 這個專案零依賴，不需要 npm install
+      - name: 啟動本機伺服器
+        run: |
+          node server.mjs --port 8787 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8787/api/health > /dev/null && break
+            sleep 1
+          done
+
+      - name: 載入真實申報資料
+        run: |
+          curl -sf -X POST http://localhost:8787/api/import/external \
+            -H 'Content-Type: application/json' -d '{"mode":"replace"}' | head -c 400; echo
+          curl -sf -X POST http://localhost:8787/api/import/file \
+            -H 'Content-Type: application/json' \
+            -d '{"path":"data/oge/transactions.csv","mode":"append"}' | head -c 400; echo
+
+      - name: 同步即時資料（價格、政策、新聞、合約、申報清單）
+        run: |
+          curl -sf -X POST http://localhost:8787/api/sync/prices    -H 'Content-Type: application/json' -d '{}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/policy    -H 'Content-Type: application/json' -d '{"all":true}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/news      -H 'Content-Type: application/json' -d '{}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/contracts -H 'Content-Type: application/json' -d '{"days":30}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/oge       -H 'Content-Type: application/json' -d '{"name":"Trump, Donald J"}' | head -c 300; echo
+
+      - name: 同步事件時鐘、市場體制、內部人交易
+        run: |
+          curl -sf -X POST http://localhost:8787/api/sync/events   -H 'Content-Type: application/json' -d '{"days":45}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/regime   -H 'Content-Type: application/json' -d '{}' | head -c 300; echo
+          curl -sf -X POST http://localhost:8787/api/sync/insiders -H 'Content-Type: application/json' -d '{"maxTickers":36,"perTicker":5}' | head -c 300; echo
+
+      - name: 預先計算分析結果（讓靜態版一開就有資料）
+        run: |
+          curl -sf 'http://localhost:8787/api/desk' > /dev/null
+          curl -sf 'http://localhost:8787/api/probability?horizon=20' > /dev/null
+
+      - name: 產生靜態版
+        run: node scripts/build-static.mjs
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
